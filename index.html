@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>COMPUFIX Portal</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;background:#000;color:#fff;font-family:'Segoe UI',Arial,sans-serif}
+body{display:flex;flex-direction:column;padding:60px 90px}
+header{display:flex;justify-content:space-between;align-items:baseline}
+.brand{font-size:64px;font-weight:800}
+.brand small{font-size:30px;color:#87CEEB;margin-left:18px;font-weight:400}
+#clock{font-size:34px;color:#87CEEB}
+hr{border:0;border-top:3px solid #1e90ff;margin:22px 0 40px;opacity:.7}
+#grid{display:flex;gap:38px;flex-wrap:wrap}
+.tile{width:300px;height:300px;border-radius:22px;background:#101418;border:5px solid #222;
+display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.tile.sel{border-color:#87CEEB;background:#0c2233;transform:scale(1.06);box-shadow:0 0 40px rgba(135,206,235,.45)}
+.tile .ico{font-size:96px}.tile .nm{font-size:34px;font-weight:600}
+#hint{margin-top:auto;font-size:26px;color:#889}
+#panel{position:fixed;inset:0;background:rgba(0,0,0,.94);display:none;flex-direction:column;
+align-items:center;justify-content:center;gap:18px;font-size:32px;text-align:center}
+#panel h2{font-size:52px;color:#87CEEB;margin-bottom:14px}
+.ok{color:#7CFC00}.bad{color:#ff6b6b}.pen{color:#ffd166}
+#panel small{color:#889;font-size:24px;margin-top:30px}
+</style>
+</head>
+<body>
+<header>
+<div class="brand">COMPUFIX<small>creando soluciones</small></div>
+<div id="clock">--:--</div>
+</header>
+<hr>
+<div id="grid"></div>
+<div id="hint">⬅⬆⬇➡ mover · OK abrir · ATRÁS salir</div>
+<div id="panel"><h2>Estado de la caja</h2><div id="lines"></div><small>ATRÁS para volver</small></div>
+<script>
+const thunder='http://127.0.0.1:9998';
+async function th(method,params){
+  try{
+    const r=await fetch(thunder+'/jsonrpc',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({jsonrpc:'2.0',id:1,method:method,params:params||{}})});
+    return await r.json();
+  }catch(e){ return null; }
+}
+async function thTry(list,params){
+  for(const m of list){ const r=await th(m,params); if(r&&!r.error) return r; }
+  return null;
+}
+const APPS=[
+ {name:'YouTube',ico:'\u25B6',go:async()=>{
+    const r=await thTry(['org.rdk.RDKShell.1.launch','RDKShell.launch'],
+      {callsign:'Cobalt',url:'https://www.youtube.com/tv'});
+    if(r){ location.href='https://www.youtube.com/tv'; }
+    else { location.href='https://www.youtube.com/tv'; }
+ }},
+ {name:'Pluto TV',ico:'\uD83DDCFA',go:()=>location.href='https://pluto.tv/en/live-tv'},
+ {name:'Tubi',ico:'\uD83CDFAC',go:()=>location.href='https://tubitv.com/'},
+ {name:'Config WiFi',ico:'\uD83DDCE1',go:showPanel},
+];
+const grid=document.getElementById('grid');
+APPS.forEach((a,i)=>{const d=document.createElement('div');d.className='tile';
+d.innerHTML='<div class="ico">'+a.ico+'</div><div class="nm">'+a.name+'</div>';
+d.onclick=a.go;grid.appendChild(d);});
+const tiles=[...document.querySelectorAll('.tile')];
+let idx=0;const COLS=4;
+function render(){tiles.forEach((t,i)=>t.classList.toggle('sel',i===idx));}
+render();
+function tick(){document.getElementById('clock').textContent=
+ new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});}
+tick();setInterval(tick,10000);
+document.addEventListener('keydown',e=>{
+ const k=e.key;
+ if(k==='ArrowRight'){idx=(idx+1)%tiles.length}
+ else if(k==='ArrowLeft'){idx=(idx-1+tiles.length)%tiles.length}
+ else if(k==='ArrowDown'){idx=Math.min(tiles.length-1,idx+COLS)}
+ else if(k==='ArrowUp'){idx=Math.max(0,idx-COLS)}
+ else if(k==='Enter'){APPS[idx].go()}
+ else if(k==='Escape'||k==='BrowserBack'||k==='GoBack'){history.back()}
+ render();e.preventDefault();
+});
+async function showPanel(){
+ const el=document.getElementById('lines');el.innerHTML='';
+ const line=(t,c)=>{const d=document.createElement('div');d.textContent=t;d.className=c;el.appendChild(d)};
+ const p=document.getElementById('panel');p.style.display='flex';
+ const r=await th('Controller.1.status',{});
+ line('API Thunder (9998): '+(r&&r.result!==undefined?'OK':'INACCESIBLE'),r&&r.result!==undefined?'ok':'bad');
+ const w=await th('org.rdk.Wifi.1.getConnectedSSID',{});
+ if(w&&w.result&&w.result.ssid){line('WiFi conectada: '+w.result.ssid,'ok')}
+ else{line('WiFi: sin datos (API bloqueada o no conectada)','pen')}
+ const c=await th('Controller.1.status',{});
+ line('Motor actual: Cobalt','ok');
+ line('Origen de esta pagina: HTTPS (GitHub Pages)','ok');
+}
+</script>
+</body>
+</html>
